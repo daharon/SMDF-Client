@@ -7,7 +7,7 @@ use rusoto_sqs::{
 };
 use serde_json::Value;
 
-use messages::{ClientCheckMessage, ClientCheckResultMessage, CheckResultStatus};
+use crate::messages::{ClientCheckMessage, ClientCheckResultMessage, CheckResultStatus};
 
 use std::process;
 use std::str;
@@ -63,8 +63,9 @@ impl Consumer {
 
     /// Execute the command as specified by the check.
     fn execute_command(&self, message: &Message)
-        -> Result<ClientCheckResultMessage, Box<std::error::Error>>
+        -> Result<ClientCheckResultMessage, Box<dyn std::error::Error>>
     {
+        // TODO: Switch to using raw SQS messages.
         println!("Received the following message:\n{:?}", message.body.as_ref().unwrap());
         // Parse the JSON message body into object.
         let sqs_notification: Value = serde_json::from_str(message.body.as_ref().unwrap())?;
@@ -86,7 +87,7 @@ impl Consumer {
             Ok(opt) => ClientCheckResultMessage {
                 name: check.name.clone(),
                 timestamp,
-                status: CheckResultStatus::OK,
+                status: CheckResultStatus::OK,  // TODO: Generate correct status.
                 output: String::from(String::from_utf8_lossy(&opt.stdout)),
             },
             Err(e) => {
