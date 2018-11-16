@@ -14,11 +14,21 @@ pub struct ClientCheckResultMessage {
     pub output: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum CheckResultStatus {
-    CRITICAL,
-    WARNING,
     OK,
+    WARNING,
+    CRITICAL,
     UNKNOWN,
 }
 
+impl CheckResultStatus {
+    pub fn from_exit_code(code: i32) -> Self {
+        match code {
+            0 => CheckResultStatus::OK,
+            1 => CheckResultStatus::WARNING,
+            2 => CheckResultStatus::CRITICAL,
+            _ => CheckResultStatus::UNKNOWN,
+        }
+    }
+}

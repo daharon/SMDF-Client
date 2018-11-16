@@ -11,15 +11,14 @@
 
 use rusoto_core::Region;
 
-use monitoring_client::consumer::Consumer;
+use monitoring_client::consumer;
 
 
-const COMMAND_QUEUE: &str = "https://sqs.us-east-1.amazonaws.com/746986273951/monitoring-91da103b-c177-4d56-a744-e61adcecb802";
-const RESULT_QUEUE: &str = "https://sqs.us-east-1.amazonaws.com/746986273951/crap-MonitoringCheckResultQueue-1OR9J6LJ378HG";
+const COMMAND_QUEUE: &str = "https://sqs.us-east-1.amazonaws.com/746986273951/monitoring-ee77f092-999e-4344-a22e-0ee36666dadf";
+const RESULT_QUEUE: &str = "https://sqs.us-east-1.amazonaws.com/746986273951/crap-MonitoringCheckResultQueue-A5KXZVOMP3KT";
 
 
 fn main() {
-    let consumer = Consumer::new(Region::UsEast1, COMMAND_QUEUE, RESULT_QUEUE);
-    consumer.run();
+    consumer::run(Region::UsEast1, COMMAND_QUEUE, RESULT_QUEUE);
 }
 
