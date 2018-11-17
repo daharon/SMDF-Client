@@ -1,5 +1,6 @@
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ClientCheckMessage {
+    pub group: String,
     pub name: String,
     pub command: String,
     pub timeout: u16,
@@ -8,7 +9,9 @@ pub struct ClientCheckMessage {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ClientCheckResultMessage {
+    pub group: String,
     pub name: String,
+    pub client: String,
     pub timestamp: String, // TODO:  Move to datetime object.
     pub status: CheckResultStatus,
     pub output: String,

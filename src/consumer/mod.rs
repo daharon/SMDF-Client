@@ -15,7 +15,7 @@ use std::str;
 use std::time::Duration;
 
 
-pub fn run(region: Region, command_queue: &'static str, result_queue: &'static str) {
+pub fn run(region: Region, client_name: &'static str, command_queue: &'static str, result_queue: &'static str) {
     let rcv_req = ReceiveMessageRequest {
         attribute_names:            Some(vec![String::from("All")]),
         max_number_of_messages:     Some(1),
@@ -40,7 +40,7 @@ pub fn run(region: Region, command_queue: &'static str, result_queue: &'static s
                         let message = message.clone();
                         let region = region.clone();
                         thread::spawn(move || {
-                            let result_msg = execute_command(&message);
+                            let result_msg = execute_command(&message, client_name);
                             println!("Result message:\n{:?}", result_msg);
                             let sqs_client = SqsClient::new(region);
                             if let Ok(result_msg) = result_msg {
@@ -56,7 +56,7 @@ pub fn run(region: Region, command_queue: &'static str, result_queue: &'static s
 }
 
 /// Execute the command as specified by the check.
-fn execute_command(message: &Message) -> Result<ClientCheckResultMessage, Box<dyn std::error::Error>>
+fn execute_command(message: &Message, client_name: &str) -> Result<ClientCheckResultMessage, Box<dyn std::error::Error>>
 {
     // TODO: Switch to using raw SQS messages.
     // TODO: Move the message parsing out of this function.
@@ -80,7 +80,9 @@ fn execute_command(message: &Message) -> Result<ClientCheckResultMessage, Box<dy
     // Marshall the command output into a `ClientCheckResultMessage`.
     let result_msg = match output {
         Ok(opt) => ClientCheckResultMessage {
+            group: check.group.clone(),
             name: check.name.clone(),
+            client: String::from(client_name),
             timestamp,
             status: CheckResultStatus::from_exit_code(opt.status.code().unwrap()),
             output: String::from(String::from_utf8_lossy(&opt.stdout)),
@@ -88,7 +90,9 @@ fn execute_command(message: &Message) -> Result<ClientCheckResultMessage, Box<dy
         Err(e) => {
             eprintln!("Command failed to run:  {:?}", e);
             ClientCheckResultMessage {
+                group: check.group.clone(),
                 name: check.name.clone(),
+                client: String::from(client_name),
                 timestamp,
                 status: CheckResultStatus::UNKNOWN,
                 output: format!("Failed to run command:  {:?}", e),
@@ -138,7 +142,7 @@ mod test {
 
     fn generate_sqs_message(command: &str) -> Message {
 
-        let msg_body = format!("{{\"name\":\"Unknown check\",\"command\":\"{}\",\"timeout\":30,\"subscribers\":[]}}", command);
+        let msg_body = format!("{{\"group\":\"test\",\"name\":\"Unknown check\",\"command\":\"{}\",\"timeout\":30,\"subscribers\":[]}}", command);
         let msg = json!({
             "Type": "Notification",
             "MessageId": "50aa8ce2-2ba9-5a30-a2b9-d88aa7418f2b",
@@ -164,9 +168,11 @@ mod test {
 
     #[test]
     fn execute_command_true() {
+        const CLIENT_NAME: &str = "test-client";
         const COMMAND: &str = "true";
+
         let msg = generate_sqs_message(COMMAND);
-        let result = execute_command(&msg).unwrap();
+        let result = execute_command(&msg, CLIENT_NAME).unwrap();
         assert_eq!("Unknown check", result.name);
         assert_eq!(CheckResultStatus::OK, result.status);
         assert_eq!("", result.output);
