@@ -11,7 +11,7 @@ pub struct ClientCheckMessage {
 pub struct ClientCheckResultMessage {
     pub group: String,
     pub name: String,
-    pub client: String,
+    pub source: String,
     pub timestamp: String, // TODO:  Move to datetime object.
     pub status: CheckResultStatus,
     pub output: String,

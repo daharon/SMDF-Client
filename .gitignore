@@ -19,6 +19,7 @@ Cargo.lock
 .idea/**/tasks.xml
 .idea/**/usage.statistics.xml
 .idea/**/shelf
+.idea/aws.xml
 
 # Sensitive or high-churn files
 .idea/**/dataSources/

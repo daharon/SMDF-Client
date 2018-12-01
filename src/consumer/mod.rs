@@ -5,7 +5,6 @@ use rusoto_sqs::{
     Message,
     DeleteMessageRequest, SendMessageRequest, ReceiveMessageRequest,
 };
-use serde_json::Value;
 
 use crate::messages::{ClientCheckMessage, ClientCheckResultMessage, CheckResultStatus};
 
@@ -17,9 +16,9 @@ use std::time::Duration;
 
 pub fn run(region: Region, client_name: &'static str, command_queue: &'static str, result_queue: &'static str) {
     let rcv_req = ReceiveMessageRequest {
-        attribute_names:            Some(vec![String::from("All")]),
+        attribute_names:            None,
         max_number_of_messages:     Some(1),
-        message_attribute_names:    Some(vec![String::from("tags")]),
+        message_attribute_names:    None,
         queue_url:                  command_queue.to_string(),
         receive_request_attempt_id: None,  // Only valid for FIFO queues.
         visibility_timeout:         Some(300),
@@ -34,13 +33,14 @@ pub fn run(region: Region, client_name: &'static str, command_queue: &'static st
                 eprintln!("Error receiving message:  {:?}", e);
                 thread::sleep(Duration::from_secs(5));
             },
-            Ok(msg_result) => {
-                if let Some(messages) = msg_result.messages {
+            Ok(sqs_messages) => {
+                if let Some(messages) = sqs_messages.messages {
                     for message in messages.iter() {
                         let message = message.clone();
                         let region = region.clone();
                         thread::spawn(move || {
-                            let result_msg = execute_command(&message, client_name);
+                            let check_message = parse_client_check_message(&message).unwrap();
+                            let result_msg = execute_command(&check_message, client_name);
                             println!("Result message:\n{:?}", result_msg);
                             let sqs_client = SqsClient::new(region);
                             if let Ok(result_msg) = result_msg {
@@ -50,25 +50,27 @@ pub fn run(region: Region, client_name: &'static str, command_queue: &'static st
                         });
                     }
                 }
-            },
+            }
         }
     }
 }
 
-/// Execute the command as specified by the check.
-fn execute_command(message: &Message, client_name: &str) -> Result<ClientCheckResultMessage, Box<dyn std::error::Error>>
+/// Parse the SQS message into [ClientCheckMessage] struct.
+fn parse_client_check_message(message: &Message)
+    -> Result<ClientCheckMessage, Box<dyn std::error::Error>>
 {
-    // TODO: Switch to using raw SQS messages.
-    // TODO: Move the message parsing out of this function.
     println!("Received the following message:\n{:?}", message.body.as_ref().unwrap());
-    // Parse the JSON message body into object.
-    let sqs_notification: Value = serde_json::from_str(message.body.as_ref().unwrap())?;
-    let msg_body_json = sqs_notification["Message"].as_str().unwrap();
-    let check = serde_json::from_str::<ClientCheckMessage>(msg_body_json)?;
+    let check = serde_json::from_str::<ClientCheckMessage>(&message.body.as_ref().unwrap())?;
     println!("Parsed JSON message:");
     println!("{:?}", check);
+    Ok(check)
+}
 
-    // Run the command.
+/// Execute the command as specified by the check.
+fn execute_command(check: &ClientCheckMessage, client_name: &str)
+    -> Result<ClientCheckResultMessage, Box<dyn std::error::Error>>
+{
+    // Run the check command.
     let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
     println!("Running check:  {}", check.command);
     let output = process::Command::new("/bin/sh")
@@ -82,7 +84,7 @@ fn execute_command(message: &Message, client_name: &str) -> Result<ClientCheckRe
         Ok(opt) => ClientCheckResultMessage {
             group: check.group.clone(),
             name: check.name.clone(),
-            client: String::from(client_name),
+            source: String::from(client_name),
             timestamp,
             status: CheckResultStatus::from_exit_code(opt.status.code().unwrap()),
             output: String::from(String::from_utf8_lossy(&opt.stdout)),
@@ -92,7 +94,7 @@ fn execute_command(message: &Message, client_name: &str) -> Result<ClientCheckRe
             ClientCheckResultMessage {
                 group: check.group.clone(),
                 name: check.name.clone(),
-                client: String::from(client_name),
+                source: String::from(client_name),
                 timestamp,
                 status: CheckResultStatus::UNKNOWN,
                 output: format!("Failed to run command:  {:?}", e),
@@ -137,27 +139,13 @@ fn delete_message(sqs_client: &SqsClient, queue: &str, message: &Message) {
 
 #[cfg(test)]
 mod test {
-    use serde_json::json;
     use super::*;
 
     fn generate_sqs_message(command: &str) -> Message {
-
-        let msg_body = format!("{{\"group\":\"test\",\"name\":\"Unknown check\",\"command\":\"{}\",\"timeout\":30,\"subscribers\":[]}}", command);
-        let msg = json!({
-            "Type": "Notification",
-            "MessageId": "50aa8ce2-2ba9-5a30-a2b9-d88aa7418f2b",
-            "TopicArn": "arn:aws:sns:us-east-1:746986273951:test",
-            "Message": msg_body.to_string(),
-            "Timestamp": "2018-11-16T09:15:20.667Z",
-            "SignatureVersion": "1",
-            "Signature": "iz6cgXKULV2DDKEnAsrVwhJvtC1k7aNcMaBFVmW925JXN3XYveVuc/5nZRAmQjXlmEbSRFv6vghlA0bCpnqZbmJSh7Lzww5oJvs0ddq53b0s9IaCTY0dzKkcAIKAhug0O3BER/qqsxCSbXOp+sfKvEnii6bY+LBNCRufZMss2Tan4SndTsE7elLwtx6jGE+UojYL/TgSY540LO636xCs6aow4SnWDO5D9mzgTT36O1IjR6zZz6990BQ1kI+tyNRShSNMzA95BGBivOe1xaMcnKsCQw24duEZHDGNw2qzwCXsHMOdJbvJAI8hgdoHOgkgqonVYMxPxdGE7rrMhkdabA==",
-            "SigningCertURL": "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-ac565b8b1a6c5d002d285f9598aa1d9b.pem",
-            "UnsubscribeURL": "https://sns.us-east-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:us-east-1:746986273951:crap-MonitoringClientCheckDistributor-U7FGIL529EU6:41a10da7-b86a-46ed-aa7b-562de7eb0726",
-            "MessageAttributes": {"tags": {"Type": "String.Array", "Value": ["test-client"]}}
-        }).to_string();
+        let body = format!("{{\"group\":\"test\",\"name\":\"Unknown check\",\"command\":\"{}\",\"timeout\":30,\"subscribers\":[]}}", command);
         Message {
             attributes: None,
-            body: Some(msg),
+            body: Some(body),
             md5_of_body: None,
             md5_of_message_attributes: None,
             message_attributes: None,
@@ -167,13 +155,29 @@ mod test {
     }
 
     #[test]
+    fn parse_sqs_message() {
+        const COMMAND: &str = "true";
+        let sqs_message = generate_sqs_message(COMMAND);
+        let parsed_message = parse_client_check_message(&sqs_message).unwrap();
+        assert_eq!("test", parsed_message.group);
+        assert_eq!("Unknown check", parsed_message.name);
+        assert_eq!(30, parsed_message.timeout);
+    }
+
+    #[test]
     fn execute_command_true() {
         const CLIENT_NAME: &str = "test-client";
-        const COMMAND: &str = "true";
+        let check_message = ClientCheckMessage {
+            group: String::from("test"),
+            name: String::from("general-check"),
+            command: String::from("true"),
+            timeout: 30,
+            subscribers: vec![],
+        };
 
-        let msg = generate_sqs_message(COMMAND);
-        let result = execute_command(&msg, CLIENT_NAME).unwrap();
-        assert_eq!("Unknown check", result.name);
+        let result = execute_command(&check_message, CLIENT_NAME).unwrap();
+        assert_eq!("test", result.group);
+        assert_eq!("general-check", result.name);
         assert_eq!(CheckResultStatus::OK, result.status);
         assert_eq!("", result.output);
     }
