@@ -22,7 +22,7 @@ impl Config {
             let environ = matches.value_of("environment").unwrap();
             format!("/{}/monitoring/registration", environ)
         };
-        Config {
+        Self {
             client_name: matches.value_of("name").unwrap().to_string(),
             tags: matches.values_of("tags").unwrap().map(String::from).collect(),
             region: Region::from_str(matches.value_of("region").unwrap()).unwrap(),

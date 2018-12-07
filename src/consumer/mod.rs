@@ -5,7 +5,7 @@ use rusoto_sqs::{
     DeleteMessageRequest, SendMessageRequest, ReceiveMessageRequest,
 };
 
-use crate::messages::{ClientCheckMessage, ClientCheckResultMessage, CheckResultStatus};
+use crate::messages::check::{ClientCheckMessage, ClientCheckResultMessage, CheckResultStatus};
 use crate::config::cli::Config;
 
 use std::thread;
@@ -14,7 +14,7 @@ use std::str;
 use std::time::Duration;
 
 
-pub fn run(config: Config, command_queue: &'static str, result_queue: &'static str) {
+pub fn run(config: &Config, command_queue: &str, result_queue: &str) {
     let rcv_req = ReceiveMessageRequest {
         attribute_names:            None,
         max_number_of_messages:     Some(1),
@@ -36,18 +36,22 @@ pub fn run(config: Config, command_queue: &'static str, result_queue: &'static s
             Ok(sqs_messages) => {
                 if let Some(messages) = sqs_messages.messages {
                     for message in messages.iter() {
-                        let message = message.clone();
-                        let region = config.region.clone();
-                        let client_name = config.client_name.clone();
+                        // Clone values for passing into spawned thread.
+                        let c_message = message.clone();
+                        let c_region = config.region.clone();
+                        let c_client_name = config.client_name.clone();
+                        let c_command_queue = command_queue.to_string();
+                        let c_result_queue = result_queue.to_string();
+                        // Spawn thread to perform check.
                         thread::spawn(move || {
-                            let check_message = parse_client_check_message(&message).unwrap();
-                            let result_msg = execute_command(&check_message, &client_name);
+                            let check_message = parse_client_check_message(&c_message).unwrap();
+                            let result_msg = execute_command(&check_message, &c_client_name);
                             println!("Result message:\n{:?}", result_msg);
-                            let sqs_client = SqsClient::new(region);
+                            let sqs_client = SqsClient::new(c_region);
                             if let Ok(result_msg) = result_msg {
-                                send_result(&sqs_client, result_queue, result_msg);
+                                send_result(&sqs_client, &c_result_queue, result_msg);
                             }
-                            delete_message(&sqs_client, command_queue, &message);
+                            delete_message(&sqs_client, &c_command_queue, &c_message);
                         });
                     }
                 }

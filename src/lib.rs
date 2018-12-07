@@ -2,6 +2,7 @@
 extern crate serde_derive;
 
 
+pub mod aws;
 pub mod config;
-mod messages;
+pub mod messages;
 pub mod consumer;
