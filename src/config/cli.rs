@@ -1,5 +1,5 @@
 use clap::{Arg, App, ArgMatches};
-use clap::{crate_version, crate_name};
+use clap::{crate_version, crate_name, value_t_or_exit};
 use rusoto_core::Region;
 
 use std::str::FromStr;
@@ -11,6 +11,7 @@ pub struct Config {
     pub tags: Vec<String>,
     pub region: Region,
     pub registration_parameter: String,
+    pub concurrency: usize,
 }
 
 impl Config {
@@ -27,6 +28,7 @@ impl Config {
             tags: matches.values_of("tags").unwrap().map(String::from).collect(),
             region: Region::from_str(matches.value_of("region").unwrap()).unwrap(),
             registration_parameter,
+            concurrency: value_t_or_exit!(matches.value_of("concurrency"), usize),
         }
     }
 }
@@ -71,5 +73,13 @@ fn parse() -> ArgMatches<'static> {
             .required(false)
             .takes_value(true)
             .value_name("PATH"))
+        .arg(Arg::with_name("concurrency")
+            .short("c")
+            .long("concurrency")
+            .help("The maximum number of checks to run concurrently (1-256).")
+            .required(false)
+            .takes_value(true)
+            .default_value("10")
+            .value_name("INT"))
         .get_matches()
 }

@@ -6,3 +6,4 @@ pub mod aws;
 pub mod config;
 pub mod messages;
 pub mod consumer;
+pub mod check_executor;
