@@ -23,13 +23,6 @@ pub fn run(config: &Config, command_queue: &str, result_queue: &str) {
     };
     let sqs_client = SqsClient::new(config.region.clone());
 
-    // Thread-pool for running checks.
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(config.concurrency)
-        .thread_name(|i| { format!("check-executor-{}", i) })
-        .build()
-        .expect("Failed to create the thread pool.");
-
     println!("Listening for messages...");
     loop {
         // Listen for a message.
@@ -48,7 +41,7 @@ pub fn run(config: &Config, command_queue: &str, result_queue: &str) {
                         let c_command_queue = command_queue.to_string();
                         let c_result_queue = result_queue.to_string();
                         // Spawn thread to perform check.
-                        pool.spawn(move || {
+                        thread::spawn(move || {
                             CheckExecutor
                                 ::new(c_config, c_command_queue, c_result_queue, c_message)
                                 .execute();

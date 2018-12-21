@@ -76,7 +76,7 @@ fn parse() -> ArgMatches<'static> {
         .arg(Arg::with_name("concurrency")
             .short("c")
             .long("concurrency")
-            .help("The maximum number of checks to run concurrently (1-256).")
+            .help("The maximum number of checks to run concurrently (1-256).\nNote:  Currently not used.")
             .required(false)
             .takes_value(true)
             .default_value("10")
