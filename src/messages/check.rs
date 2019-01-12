@@ -1,5 +1,10 @@
-#[derive(Debug, Serialize, Deserialize)]
+use chrono::{DateTime, Utc};
+
+
+#[derive(Debug, Deserialize)]
 pub struct ClientCheckMessage {
+    #[serde(rename = "scheduledAt")]
+    pub scheduled_at: DateTime<Utc>,
     pub group: String,
     pub name: String,
     pub command: String,
@@ -7,12 +12,17 @@ pub struct ClientCheckMessage {
     pub subscribers: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub struct ClientCheckResultMessage {
+    #[serde(rename = "completedAt")]
+    pub completed_at: DateTime<Utc>,
+    #[serde(rename = "scheduledAt")]
+    pub scheduled_at: DateTime<Utc>,
+    #[serde(rename = "executedAt")]
+    pub executed_at: DateTime<Utc>,
     pub group: String,
     pub name: String,
     pub source: String,
-    pub timestamp: String, // TODO:  Move to datetime object.
     pub status: CheckResultStatus,
     pub output: String,
 }

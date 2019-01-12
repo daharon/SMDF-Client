@@ -1,6 +1,6 @@
 use std::process;
 
-use chrono::{Utc, SecondsFormat};
+use chrono::Utc;
 use rusoto_sqs::{
     SqsClient, Sqs,
     Message,
@@ -59,7 +59,7 @@ fn execute_command(check: &ClientCheckMessage, client_name: &str)
                    -> Result<ClientCheckResultMessage, Box<dyn std::error::Error>>
 {
     // Run the check command.
-    let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+    let executed_at = Utc::now();
     println!("Running check:  {}", check.command);
     let output = process::Command::new("/bin/sh")
         .arg("-c")
@@ -70,20 +70,24 @@ fn execute_command(check: &ClientCheckMessage, client_name: &str)
     // Marshall the command output into a `ClientCheckResultMessage`.
     let result_msg = match output {
         Ok(opt) => ClientCheckResultMessage {
+            completed_at: Utc::now(),
+            scheduled_at: check.scheduled_at,
+            executed_at,
             group: check.group.clone(),
             name: check.name.clone(),
             source: String::from(client_name),
-            timestamp,
             status: CheckResultStatus::from_exit_code(opt.status.code().unwrap()),
             output: String::from(String::from_utf8_lossy(&opt.stdout)),
         },
         Err(e) => {
             eprintln!("Command failed to run:  {:?}", e);
             ClientCheckResultMessage {
+                completed_at: Utc::now(),
+                scheduled_at: check.scheduled_at,
+                executed_at,
                 group: check.group.clone(),
                 name: check.name.clone(),
                 source: String::from(client_name),
-                timestamp,
                 status: CheckResultStatus::UNKNOWN,
                 output: format!("Failed to run command:  {:?}", e),
             }
@@ -128,9 +132,10 @@ fn delete_message(sqs_client: &SqsClient, queue: &str, message: &Message) {
 #[cfg(test)]
 mod test {
     use super::*;
+    use chrono::DateTime;
 
     fn generate_sqs_message(command: &str) -> Message {
-        let body = format!("{{\"group\":\"test\",\"name\":\"Unknown check\",\"command\":\"{}\",\"timeout\":30,\"subscribers\":[]}}", command);
+        let body = format!("{{\"scheduledAt\":\"2019-01-10T11:07:44Z\",\"group\":\"test\",\"name\":\"Unknown check\",\"command\":\"{}\",\"timeout\":30,\"subscribers\":[]}}", command);
         Message {
             attributes: None,
             body: Some(body),
@@ -147,6 +152,7 @@ mod test {
         const COMMAND: &str = "true";
         let sqs_message = generate_sqs_message(COMMAND);
         let parsed_message = parse_client_check_message(&sqs_message).unwrap();
+        assert_eq!("2019-01-10T11:07:44Z".parse::<DateTime<Utc>>().unwrap(), parsed_message.scheduled_at);
         assert_eq!("test", parsed_message.group);
         assert_eq!("Unknown check", parsed_message.name);
         assert_eq!(30, parsed_message.timeout);
@@ -155,7 +161,9 @@ mod test {
     #[test]
     fn execute_command_true() {
         const CLIENT_NAME: &str = "test-client";
+        const SCHEDULED_AT: &str = "2019-01-10T11:07:44Z";
         let check_message = ClientCheckMessage {
+            scheduled_at: SCHEDULED_AT.parse::<DateTime<Utc>>().unwrap(),
             group: String::from("test"),
             name: String::from("general-check"),
             command: String::from("true"),
@@ -164,6 +172,7 @@ mod test {
         };
 
         let result = execute_command(&check_message, CLIENT_NAME).unwrap();
+        assert_eq!(SCHEDULED_AT.parse::<DateTime<Utc>>().unwrap(), result.scheduled_at);
         assert_eq!("test", result.group);
         assert_eq!("general-check", result.name);
         assert_eq!(CheckResultStatus::OK, result.status);
