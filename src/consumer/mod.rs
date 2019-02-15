@@ -2,6 +2,7 @@ use std::thread;
 use std::str;
 use std::time::Duration;
 
+use log::{info, error};
 use rusoto_sqs::{
     SqsClient, Sqs, ReceiveMessageRequest,
 };
@@ -23,13 +24,13 @@ pub fn run(config: &Config, command_queue: &str, result_queue: &str) {
     };
     let sqs_client = SqsClient::new(config.region.clone());
 
-    println!("Listening for messages...");
+    info!("Listening for messages...");
     loop {
         // Listen for a message.
         let rcv_res = sqs_client.receive_message(rcv_req.clone()).sync();
         match rcv_res {
             Err(e) => {
-                eprintln!("Error receiving message:  {:?}", e);
+                error!("Error receiving message:  {:?}", e);
                 thread::sleep(Duration::from_secs(5));
             },
             Ok(sqs_messages) => {

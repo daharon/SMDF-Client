@@ -1,10 +1,13 @@
 [package]
 name = "monitoring-client"
 version = "0.1.0"
+description = "Monitoring client"
 authors = ["Dan Aharon <dan@danielaharon.com>"]
 edition = "2018"
 
 [dependencies]
+log = "0.4.6"
+simplelog = "0.5.3"
 clap = "2.32.0"
 rusoto_core = "0.35.0"
 rusoto_sqs = "0.35.0"
@@ -14,3 +17,9 @@ serde = "1.0.80"
 serde_derive = "1.0.80"
 serde_json = "1.0.33"
 chrono = { version = "0.4.6", features = ["serde"] }
+
+[package.metadata.rpm.cargo]
+buildflags = ["--release"]
+
+[package.metadata.rpm.targets]
+monitoring-client = { path = "/usr/bin/monitoring-client" }

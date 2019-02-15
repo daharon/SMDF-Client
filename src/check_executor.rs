@@ -1,6 +1,7 @@
 use std::process;
 
 use chrono::Utc;
+use log::{debug, error};
 use rusoto_sqs::{
     SqsClient, Sqs,
     Message,
@@ -33,7 +34,7 @@ impl CheckExecutor {
     pub fn execute(&self) {
         let check_message = parse_client_check_message(&self.message).unwrap();
         let result_msg = execute_command(&check_message, &self.config.client_name);
-        println!("Result message:\n{:?}", result_msg);
+        debug!("Result message:\n{:?}", result_msg);
         let sqs_client = SqsClient::new(self.config.region.clone());
         if let Ok(result_msg) = result_msg {
             send_result(&sqs_client, &self.result_queue, result_msg);
@@ -47,10 +48,10 @@ impl CheckExecutor {
 fn parse_client_check_message(message: &Message)
                               -> Result<ClientCheckMessage, Box<dyn std::error::Error>>
 {
-    println!("Received the following message:\n{:?}", message.body.as_ref().unwrap());
+    debug!("Received the following message:\n{:?}", message.body.as_ref().unwrap());
     let check = serde_json::from_str::<ClientCheckMessage>(&message.body.as_ref().unwrap())?;
-    println!("Parsed JSON message:");
-    println!("{:?}", check);
+    debug!("Parsed JSON message:");
+    debug!("{:?}", check);
     Ok(check)
 }
 
@@ -60,7 +61,7 @@ fn execute_command(check: &ClientCheckMessage, client_name: &str)
 {
     // Run the check command.
     let executed_at = Utc::now();
-    println!("Running check:  {}", check.command);
+    debug!("Running check:  {}", check.command);
     let output = process::Command::new("/bin/sh")
         .arg("-c")
         .arg(&check.command)
@@ -80,7 +81,7 @@ fn execute_command(check: &ClientCheckMessage, client_name: &str)
             output: String::from(String::from_utf8_lossy(&opt.stdout)),
         },
         Err(e) => {
-            eprintln!("Command failed to run:  {:?}", e);
+            error!("Command failed to run:  {}", e);
             ClientCheckResultMessage {
                 completed_at: Utc::now(),
                 scheduled_at: check.scheduled_at,
@@ -89,7 +90,7 @@ fn execute_command(check: &ClientCheckMessage, client_name: &str)
                 name: check.name.clone(),
                 source: String::from(client_name),
                 status: CheckResultStatus::UNKNOWN,
-                output: format!("Failed to run command:  {:?}", e),
+                output: format!("Failed to run command:  {}", e),
             }
         }
     };
@@ -109,8 +110,8 @@ fn send_result(sqs_client: &SqsClient, queue: &str, message: ClientCheckResultMe
     };
     let res = sqs_client.send_message(req).sync();
     match res {
-        Ok(r) => println!("Sent message to result queue:  {}", r.message_id.as_ref().unwrap()),
-        Err(e) => println!("Failed to send message to result queue:\n{:?}", e),
+        Ok(r) => debug!("Sent message to result queue:  {}", r.message_id.as_ref().unwrap()),
+        Err(e) => error!("Failed to send message to result queue:\n{}", e),
     }
 }
 
@@ -123,8 +124,8 @@ fn delete_message(sqs_client: &SqsClient, queue: &str, message: &Message) {
     };
     let del_res = sqs_client.delete_message(del_req).sync();
     match del_res {
-        Err(e) => eprintln!("Error deleting message:  {:?}", e),
-        Ok(_) => println!("Deleted message {}", message.message_id.as_ref().unwrap()),
+        Err(e) => error!("Error deleting message:  {:?}", e),
+        Ok(_) => debug!("Deleted message {}", message.message_id.as_ref().unwrap()),
     }
 }
 

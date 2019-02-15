@@ -12,6 +12,7 @@ pub struct Config {
     pub region: Region,
     pub registration_parameter: String,
     pub concurrency: usize,
+    pub log_level: log::LevelFilter,
 }
 
 impl Config {
@@ -29,6 +30,7 @@ impl Config {
             region: Region::from_str(matches.value_of("region").unwrap()).unwrap(),
             registration_parameter,
             concurrency: value_t_or_exit!(matches.value_of("concurrency"), usize),
+            log_level: value_t_or_exit!(matches.value_of("log-level"), log::LevelFilter),
         }
     }
 }
@@ -37,6 +39,14 @@ fn parse() -> ArgMatches<'static> {
     App::new(crate_name!())
         .about("Monitoring client.")
         .version(crate_version!())
+        .arg(Arg::with_name("log-level")
+            .short("l")
+            .long("log-level")
+            .help("Log level (TRACE, DEBUG, ERROR, WARN, INFO).")
+            .required(false)
+            .takes_value(true)
+            .default_value("info")
+            .value_name("LEVEL"))
         .arg(Arg::with_name("region")
             .short("r")
             .long("region")
