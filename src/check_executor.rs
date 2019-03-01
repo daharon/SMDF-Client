@@ -169,7 +169,7 @@ mod test {
             name: String::from("general-check"),
             command: String::from("true"),
             timeout: 30,
-            subscribers: vec![],
+            tags: vec![],
         };
 
         let result = execute_command(&check_message, CLIENT_NAME).unwrap();

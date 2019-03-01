@@ -9,7 +9,7 @@ pub struct ClientCheckMessage {
     pub name: String,
     pub command: String,
     pub timeout: u16,
-    pub subscribers: Vec<String>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
