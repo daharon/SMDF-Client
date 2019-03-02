@@ -67,9 +67,9 @@ fn execute_command(check: &ClientCheckMessage, client_name: &str)
     // Run the check command.
     let executed_at = Utc::now();
     debug!("Running check:  {}", check.command);
-    let output = process::Command::new("/bin/sh")
-        .arg("-c")
-        .arg(format!("{} --signal=TERM {}s {}", TIMEOUT_CMD, check.timeout, check.command))
+    let output = process::Command::new(TIMEOUT_CMD)
+        .args(&["--signal", "TERM", &format!("{}s", check.timeout)])
+        .args(&["/bin/sh", "-c", &check.command])
         .env_clear()
         .output();
 
@@ -79,11 +79,14 @@ fn execute_command(check: &ClientCheckMessage, client_name: &str)
             let output_msg: String = if opt.status.code().unwrap() == 124 {
                 // The `timeout` command returns status code 124 on time-out.
                 error!("Command exited with status code 124, signifying a time-out:  {}", check.command);
-                let stderr = String::from_utf8_lossy(&opt.stderr);
-                error!("{}", stderr);
-                format!("Check command timed out:  {}", stderr)
+                let err_msg: String = if opt.stderr.is_empty() { String::from("<empty>") }
+                    else { String::from_utf8_lossy(&opt.stderr).to_string() };
+                error!("{}", err_msg);
+                format!("Check command timed out after {} seconds:  {}",
+                    Utc::now().signed_duration_since(executed_at).num_seconds(),
+                    err_msg)
             } else {
-                String::from(String::from_utf8_lossy(&opt.stdout))
+                String::from_utf8_lossy(&opt.stdout).to_string()
             };
             ClientCheckResultMessage {
                 completed_at: Utc::now(),
@@ -253,6 +256,28 @@ mod test {
 
         let result = execute_command(&check_message, CLIENT_NAME).unwrap();
 
+        assert_eq!(CheckResultStatus::UNKNOWN, result.status);
+        assert!(result.output.starts_with("Check command timed out"));
+    }
+
+    /// Check commands which include pipes or bash operators must
+    /// timeout as expected.
+    #[test]
+    fn execute_command_timeout_complex() {
+        const CLIENT_NAME: &str = "test-client";
+        const SCHEDULED_AT: &str = "2019-01-10T11:07:44Z";
+        let check_message = ClientCheckMessage {
+            scheduled_at: SCHEDULED_AT.parse::<DateTime<Utc>>().unwrap(),
+            group: String::from("test"),
+            name: String::from("complex-timeout-check"),
+            command: String::from("sleep 30 || sleep 5"),
+            timeout: 2,
+            tags: vec![],
+        };
+
+        let result = execute_command(&check_message, CLIENT_NAME).unwrap();
+
+        println!("{:?}", result);
         assert_eq!(CheckResultStatus::UNKNOWN, result.status);
         assert!(result.output.starts_with("Check command timed out"));
     }
