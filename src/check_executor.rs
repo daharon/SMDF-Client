@@ -59,26 +59,42 @@ fn parse_client_check_message(message: &Message)
 fn execute_command(check: &ClientCheckMessage, client_name: &str)
                    -> Result<ClientCheckResultMessage, Box<dyn std::error::Error>>
 {
+    #[cfg(target_os = "macos")]
+    const TIMEOUT_CMD: &str = "/usr/local/bin/gtimeout";  // brew install coreutils
+    #[cfg(target_os = "linux")]
+    const TIMEOUT_CMD: &str = "/usr/bin/timeout";
+
     // Run the check command.
     let executed_at = Utc::now();
     debug!("Running check:  {}", check.command);
     let output = process::Command::new("/bin/sh")
         .arg("-c")
-        .arg(&check.command)
+        .arg(format!("{} --signal=TERM {}s {}", TIMEOUT_CMD, check.timeout, check.command))
         .env_clear()
         .output();
 
     // Marshall the command output into a `ClientCheckResultMessage`.
     let result_msg = match output {
-        Ok(opt) => ClientCheckResultMessage {
-            completed_at: Utc::now(),
-            scheduled_at: check.scheduled_at,
-            executed_at,
-            group: check.group.clone(),
-            name: check.name.clone(),
-            source: String::from(client_name),
-            status: CheckResultStatus::from_exit_code(opt.status.code().unwrap()),
-            output: String::from(String::from_utf8_lossy(&opt.stdout)),
+        Ok(opt) => {
+            let output_msg: String = if opt.status.code().unwrap() == 124 {
+                // The `timeout` command returns status code 124 on time-out.
+                error!("Command exited with status code 124, signifying a time-out:  {}", check.command);
+                let stderr = String::from_utf8_lossy(&opt.stderr);
+                error!("{}", stderr);
+                format!("Check command timed out:  {}", stderr)
+            } else {
+                String::from(String::from_utf8_lossy(&opt.stdout))
+            };
+            ClientCheckResultMessage {
+                completed_at: Utc::now(),
+                scheduled_at: check.scheduled_at,
+                executed_at,
+                group: check.group.clone(),
+                name: check.name.clone(),
+                source: String::from(client_name),
+                status: CheckResultStatus::from_exit_code(opt.status.code().unwrap()),
+                output: output_msg,
+            }
         },
         Err(e) => {
             error!("Command failed to run:  {}", e);
@@ -92,7 +108,7 @@ fn execute_command(check: &ClientCheckMessage, client_name: &str)
                 status: CheckResultStatus::UNKNOWN,
                 output: format!("Failed to run command:  {}", e),
             }
-        }
+        },
     };
     Ok(result_msg)
 }
@@ -136,7 +152,7 @@ mod test {
     use chrono::DateTime;
 
     fn generate_sqs_message(command: &str) -> Message {
-        let body = format!("{{\"scheduledAt\":\"2019-01-10T11:07:44Z\",\"group\":\"test\",\"name\":\"Unknown check\",\"command\":\"{}\",\"timeout\":30,\"subscribers\":[]}}", command);
+        let body = format!("{{\"scheduledAt\":\"2019-01-10T11:07:44Z\",\"group\":\"test\",\"name\":\"Unknown check\",\"command\":\"{}\",\"timeout\":30,\"tags\":[]}}", command);
         Message {
             attributes: None,
             body: Some(body),
@@ -160,14 +176,14 @@ mod test {
     }
 
     #[test]
-    fn execute_command_true() {
+    fn execute_command_ok() {
         const CLIENT_NAME: &str = "test-client";
         const SCHEDULED_AT: &str = "2019-01-10T11:07:44Z";
         let check_message = ClientCheckMessage {
             scheduled_at: SCHEDULED_AT.parse::<DateTime<Utc>>().unwrap(),
             group: String::from("test"),
-            name: String::from("general-check"),
-            command: String::from("true"),
+            name: String::from("ok-check"),
+            command: String::from("echo \"Ok check\" && exit 0"),
             timeout: 30,
             tags: vec![],
         };
@@ -175,8 +191,69 @@ mod test {
         let result = execute_command(&check_message, CLIENT_NAME).unwrap();
         assert_eq!(SCHEDULED_AT.parse::<DateTime<Utc>>().unwrap(), result.scheduled_at);
         assert_eq!("test", result.group);
-        assert_eq!("general-check", result.name);
+        assert_eq!("ok-check", result.name);
         assert_eq!(CheckResultStatus::OK, result.status);
-        assert_eq!("", result.output);
+        assert_eq!("Ok check\n", result.output);
+    }
+
+    #[test]
+    fn execute_command_critical() {
+        const CLIENT_NAME: &str = "test-client";
+        const SCHEDULED_AT: &str = "2019-01-10T11:07:44Z";
+        let check_message = ClientCheckMessage {
+            scheduled_at: SCHEDULED_AT.parse::<DateTime<Utc>>().unwrap(),
+            group: String::from("test"),
+            name: String::from("critical-check"),
+            command: String::from("echo \"Critical check\" && exit 2"),
+            timeout: 30,
+            tags: vec![],
+        };
+
+        let result = execute_command(&check_message, CLIENT_NAME).unwrap();
+        assert_eq!(SCHEDULED_AT.parse::<DateTime<Utc>>().unwrap(), result.scheduled_at);
+        assert_eq!("test", result.group);
+        assert_eq!("critical-check", result.name);
+        assert_eq!(CheckResultStatus::CRITICAL, result.status);
+        assert_eq!("Critical check\n", result.output);
+    }
+
+    #[test]
+    fn execute_command_unknown() {
+        const CLIENT_NAME: &str = "test-client";
+        const SCHEDULED_AT: &str = "2019-01-10T11:07:44Z";
+        let check_message = ClientCheckMessage {
+            scheduled_at: SCHEDULED_AT.parse::<DateTime<Utc>>().unwrap(),
+            group: String::from("test"),
+            name: String::from("unknown-check"),
+            command: String::from("echo \"Unknown check\" && exit 11"),
+            timeout: 30,
+            tags: vec![],
+        };
+
+        let result = execute_command(&check_message, CLIENT_NAME).unwrap();
+        assert_eq!(SCHEDULED_AT.parse::<DateTime<Utc>>().unwrap(), result.scheduled_at);
+        assert_eq!("test", result.group);
+        assert_eq!("unknown-check", result.name);
+        assert_eq!(CheckResultStatus::UNKNOWN, result.status);
+        assert_eq!("Unknown check\n", result.output);
+    }
+
+    #[test]
+    fn execute_command_timeout() {
+        const CLIENT_NAME: &str = "test-client";
+        const SCHEDULED_AT: &str = "2019-01-10T11:07:44Z";
+        let check_message = ClientCheckMessage {
+            scheduled_at: SCHEDULED_AT.parse::<DateTime<Utc>>().unwrap(),
+            group: String::from("test"),
+            name: String::from("timeout-check"),
+            command: String::from("sleep 30"),
+            timeout: 2,
+            tags: vec![],
+        };
+
+        let result = execute_command(&check_message, CLIENT_NAME).unwrap();
+
+        assert_eq!(CheckResultStatus::UNKNOWN, result.status);
+        assert!(result.output.starts_with("Check command timed out"));
     }
 }

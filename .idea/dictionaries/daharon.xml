@@ -1,9 +1,18 @@
 <component name="ProjectDictionaryState">
   <dictionary name="daharon">
     <words>
+      <w>bindir</w>
+      <w>builddir</w>
+      <w>buildroot</w>
       <w>chrono</w>
+      <w>coreutils</w>
+      <w>defattr</w>
+      <w>gtimeout</w>
+      <w>macos</w>
       <w>rusoto</w>
       <w>serde</w>
+      <w>sysconfdir</w>
+      <w>systemd</w>
     </words>
   </dictionary>
 </component>
