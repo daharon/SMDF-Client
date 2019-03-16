@@ -2,6 +2,7 @@
 name = "monitoring-client"
 version = "0.1.0"
 description = "Monitoring client"
+license = "UNLICENSED"
 authors = ["Dan Aharon <dan@danielaharon.com>"]
 edition = "2018"
 
