@@ -1,15 +1,34 @@
 #!/usr/bin/env bash
+#
+# Required environment variables:
+#   TAGS
+#   ENVIRONMENT
+# Optional:
+#   REGION
+#   LOG_LEVEL
+#   NAME
+
+function ecs_task_id() {
+    # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint-v3.html
+    TASK_ARN=$(
+        curl --silent "${ECS_CONTAINER_METADATA_URI}/task" \
+        | jq -r ' .TaskARN '
+    )
+    TASK_ID=${TASK_ARN##*/}
+    echo "${TASK_ID}"
+}
 
 OPTS=
+REGION=${REGION:-${AWS_REGION}}
+LOG_LEVEL=${LOG_LEVEL:-INFO}
+TASK_ID=$(ecs_task_id)
+NAME=${NAME:-${TASK_ID}}
+
+: "${NAME:?}"
+: "${ENVIRONMENT:?}"
 
 if [[ -n $REG_PARAMETER ]] ; then
     OPTS="${OPTS} --reg-parameter ${REG_PARAMETER}"
-fi
-if [[ -z $REGION ]] ; then
-    REGION="${AWS_REGION}"
-fi
-if [[ -z $LOG_LEVEL ]] ; then
-    LOG_LEVEL="INFO"
 fi
 
 echo "Region:  ${REGION}"

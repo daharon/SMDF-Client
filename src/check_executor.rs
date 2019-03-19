@@ -68,6 +68,7 @@ fn execute_command(check: &ClientCheckMessage, client_name: &str)
     let executed_at = Utc::now();
     debug!("Running check:  {}", check.command);
     let output = process::Command::new(TIMEOUT_CMD)
+        // FIXME: --signal is not a valid option in the timeout exe provided by Alpine Linux.
         .args(&["--signal", "TERM", &format!("{}s", check.timeout)])
         .args(&["/bin/sh", "-c", &check.command])
         .env_clear()

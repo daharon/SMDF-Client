@@ -6,20 +6,37 @@ RUN mkdir -p /tmp/build
 COPY ./ /tmp/build
 WORKDIR /tmp/build
 
-#RUN apt-get update
-#RUN apt-get --yes install musl-tools
-#RUN rustup target add x86_64-unknown-linux-musl
-#RUN RUSTFLAGS=-Clinker=musl-gcc \
-#    cargo build \
-#        --target=x86_64-unknown-linux-musl \
-#        --release
-RUN cargo build --release
+RUN apt-get update
+RUN apt-get --yes install \
+    build-essential \
+    musl-tools
+
+# Build OpenSSL for musl libc (required to run on Alpine)
+ENV OPENSSL_VERSION 1.0.2r
+RUN curl -LO "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" \
+    && tar xzf "openssl-${OPENSSL_VERSION}.tar.gz" \
+    && cd "openssl-${OPENSSL_VERSION}" \
+    && CC=musl-gcc ./Configure no-shared no-zlib -fPIC --prefix=/usr/local/musl linux-x86_64 \
+    && C_INCLUDE_PATH=/usr/local/musl/include/ make depend \
+    && make && make install
+
+ENV OPENSSL_DIR /usr/local/musl/
+ENV OPENSSL_LIB_DIR /usr/local/musl/lib/
+ENV DEP_OPENSSL_INCLUDE /usr/local/musl/include/
+ENV OPENSSL_INCLUDE_DIR /usr/local/musl/include/
+ENV OPENSSL_STATIC 1
+
+# Build monitoring client
+RUN rustup target add x86_64-unknown-linux-musl
+RUN RUSTFLAGS=-Clinker=musl-gcc \
+    cargo build \
+        --target=x86_64-unknown-linux-musl \
+        --release
 
 
 #####################################
 # Package
-#FROM alpine:latest
-FROM debian:9
+FROM alpine:3.9
 
 #ENV LOG_LEVEL INFO
 #ENV ENVIRONMENT
@@ -28,25 +45,23 @@ FROM debian:9
 #ENV TAGS
 #ENV REG_PARAMETER
 
-#RUN apk --no-cache add nagios-plugins-all
-#RUN apk cache clean
-RUN apt-get update
-RUN apt-get --yes install ca-certificates
-RUN apt-get --yes install monitoring-plugins
-RUN apt-get clean
-RUN rm -rf /var/lib/apt/lists/*
+RUN apk --no-cache add \
+    nagios-plugins-all \
+    ca-certificates \
+    curl \
+    jq
+RUN mkdir /usr/lib64 \
+    && ln -s /usr/lib/nagios /usr/lib64/nagios
 
 COPY --from=build \
-#    /tmp/build/target/x86_64-unknown-linux-musl/release/monitoring-client \
-    /tmp/build/target/release/monitoring-client \
+    /tmp/build/target/x86_64-unknown-linux-musl/release/monitoring-client \
     /usr/local/bin/monitoring-client
 COPY --from=build \
     /tmp/build/package/docker/start.sh \
     /usr/local/bin/monitoring-client-start.sh
 RUN chmod +x /usr/local/bin/monitoring-client-start.sh
 
-# Add non-root user.
-RUN adduser --shell /bin/sh --uid 1000 mon
+RUN adduser -D --shell /bin/sh --uid 1000 mon
 WORKDIR /home/mon
 USER mon
 
