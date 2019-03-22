@@ -8,7 +8,7 @@ pub struct ClientCheckMessage {
     pub group: String,
     pub name: String,
     pub command: String,
-    pub timeout: u16,
+    pub timeout: usize,
     pub tags: Vec<String>,
 }
 

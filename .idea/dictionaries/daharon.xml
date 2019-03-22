@@ -9,6 +9,7 @@
       <w>defattr</w>
       <w>gtimeout</w>
       <w>macos</w>
+      <w>musl</w>
       <w>rusoto</w>
       <w>serde</w>
       <w>sysconfdir</w>

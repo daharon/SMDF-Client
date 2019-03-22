@@ -12,6 +12,7 @@ use crate::config::cli::Config;
 use crate::messages::check::{
     ClientCheckMessage, ClientCheckResultMessage, CheckResultStatus
 };
+use crate::timeout;
 
 
 pub struct CheckExecutor {
@@ -34,7 +35,7 @@ impl CheckExecutor {
     pub fn execute(&self) {
         let check_message = parse_client_check_message(&self.message).unwrap();
         let result_msg = execute_command(&check_message, &self.config.client_name);
-        debug!("Result message:\n{:?}", result_msg);
+        debug!("Result message:  {:?}", result_msg);
         let sqs_client = SqsClient::new(self.config.region.clone());
         if let Ok(result_msg) = result_msg {
             send_result(&sqs_client, &self.result_queue, result_msg);
@@ -48,10 +49,9 @@ impl CheckExecutor {
 fn parse_client_check_message(message: &Message)
                               -> Result<ClientCheckMessage, Box<dyn std::error::Error>>
 {
-    debug!("Received the following message:\n{:?}", message.body.as_ref().unwrap());
-    let check = serde_json::from_str::<ClientCheckMessage>(&message.body.as_ref().unwrap())?;
-    debug!("Parsed JSON message:");
-    debug!("{:?}", check);
+    debug!("Received the following message:  {:?}", message.body.as_ref().unwrap());
+    let check = serde_json::from_str::<ClientCheckMessage>(message.body.as_ref().unwrap())?;
+    debug!("Parsed JSON message:  {:?}", check);
     Ok(check)
 }
 
@@ -59,27 +59,19 @@ fn parse_client_check_message(message: &Message)
 fn execute_command(check: &ClientCheckMessage, client_name: &str)
                    -> Result<ClientCheckResultMessage, Box<dyn std::error::Error>>
 {
-    #[cfg(target_os = "macos")]
-    const TIMEOUT_CMD: &str = "/usr/local/bin/gtimeout";  // brew install coreutils
-    #[cfg(target_os = "linux")]
-    const TIMEOUT_CMD: &str = "/usr/bin/timeout";
-
-    // Run the check command.
     let executed_at = Utc::now();
     debug!("Running check:  {}", check.command);
-    let output = process::Command::new(TIMEOUT_CMD)
-        // FIXME: --signal is not a valid option in the timeout exe provided by Alpine Linux.
-        .args(&["--signal", "TERM", &format!("{}s", check.timeout)])
+    let output = process::Command::new(timeout::CMD)
+        .args(timeout::opts(check.timeout))
         .args(&["/bin/sh", "-c", &check.command])
         .env_clear()
         .output();
 
-    // Marshall the command output into a `ClientCheckResultMessage`.
-    let result_msg = match output {
+    let result_msg: ClientCheckResultMessage = match output {
         Ok(opt) => {
-            let output_msg: String = if opt.status.code().unwrap() == 124 {
-                // The `timeout` command returns status code 124 on time-out.
-                error!("Command exited with status code 124, signifying a time-out:  {}", check.command);
+            let output_msg: String = if opt.status.code().unwrap() == timeout::EXIT_CODE {
+                error!("Command exited with status code {}, signifying a time-out:  {}",
+                       timeout::EXIT_CODE, check.command);
                 let err_msg: String = if opt.stderr.is_empty() { String::from("<empty>") }
                     else { String::from_utf8_lossy(&opt.stderr).to_string() };
                 error!("{}", err_msg);
@@ -131,7 +123,7 @@ fn send_result(sqs_client: &SqsClient, queue: &str, message: ClientCheckResultMe
     let res = sqs_client.send_message(req).sync();
     match res {
         Ok(r) => debug!("Sent message to result queue:  {}", r.message_id.as_ref().unwrap()),
-        Err(e) => error!("Failed to send message to result queue:\n{}", e),
+        Err(e) => error!("Failed to send message to result queue:  {}", e),
     }
 }
 
