@@ -42,7 +42,6 @@ impl CheckExecutor {
         }
         delete_message(&sqs_client, &self.command_queue, &self.message);
     }
-
 }
 
 /// Parse the SQS message into [ClientCheckMessage] struct.

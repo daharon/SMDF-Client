@@ -1,6 +1,6 @@
 #####################################
 # Build
-FROM rust:1.33 as build
+FROM rust:1.34 as build
 
 RUN mkdir -p /tmp/build
 COPY ./ /tmp/build
@@ -26,7 +26,7 @@ ENV DEP_OPENSSL_INCLUDE /usr/local/musl/include/
 ENV OPENSSL_INCLUDE_DIR /usr/local/musl/include/
 ENV OPENSSL_STATIC 1
 
-# Build monitoring client
+# Build SMDF client
 RUN rustup target add x86_64-unknown-linux-musl
 RUN RUSTFLAGS=-Clinker=musl-gcc \
     cargo build \
@@ -54,15 +54,15 @@ RUN mkdir /usr/lib64 \
     && ln -s /usr/lib/nagios /usr/lib64/nagios
 
 COPY --from=build \
-    /tmp/build/target/x86_64-unknown-linux-musl/release/monitoring-client \
-    /usr/local/bin/monitoring-client
+    /tmp/build/target/x86_64-unknown-linux-musl/release/smdf-client \
+    /usr/local/bin/smdf-client
 COPY --from=build \
     /tmp/build/package/docker/start.sh \
-    /usr/local/bin/monitoring-client-start.sh
-RUN chmod +x /usr/local/bin/monitoring-client-start.sh
+    /usr/local/bin/smdf-client-start.sh
+RUN chmod +x /usr/local/bin/smdf-client-start.sh
 
 RUN adduser -D --shell /bin/sh --uid 1000 mon
 WORKDIR /home/mon
 USER mon
 
-ENTRYPOINT /usr/local/bin/monitoring-client-start.sh /usr/local/bin/monitoring-client
+ENTRYPOINT /usr/local/bin/smdf-client-start.sh /usr/local/bin/smdf-client

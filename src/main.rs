@@ -1,6 +1,6 @@
-//! # Monitoring Client
+//! # SMDF Client
 //!
-//! This application is the client side of the Monitoring project.
+//! This application is the client side of the SMDF monitoring project.
 //! 1. Register client.
 //! 1. Read from the command queue.
 //! 1. Execute the specified command.
@@ -9,10 +9,10 @@
 use simplelog::SimpleLogger;
 use log::{debug, error, info};
 
-use monitoring_client::consumer;
-use monitoring_client::config::{cli, ssm};
-use monitoring_client::messages::registration::ClientRegistrationRequest;
-use monitoring_client::aws;
+use smdf_client::consumer;
+use smdf_client::config::{cli, ssm};
+use smdf_client::messages::registration::ClientRegistrationRequest;
+use smdf_client::aws;
 
 
 fn main() {

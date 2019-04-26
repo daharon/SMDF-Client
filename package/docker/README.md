@@ -1,4 +1,4 @@
-# Monitoring Client Docker Image
+# SMDF Client Docker Image
 
 ## Usage
 
@@ -15,5 +15,5 @@
 
 ## Build
 ```
-$ docker build --file ./package/docker/Dockerfile --tag monitoring-client .
+$ docker build --file ./package/docker/Dockerfile --tag smdf-client .
 ```

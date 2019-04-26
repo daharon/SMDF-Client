@@ -22,7 +22,7 @@ impl Config {
             matches.value_of("reg-parameter").unwrap().to_string()
         } else {
             let environ = matches.value_of("environment").unwrap();
-            format!("/{}/monitoring/registration", environ)
+            format!("/{}/smdf/registration", environ)
         };
         Self {
             client_name: matches.value_of("name").unwrap().to_string(),
@@ -37,7 +37,7 @@ impl Config {
 
 fn parse() -> ArgMatches<'static> {
     App::new(crate_name!())
-        .about("Monitoring client.")
+        .about("SMDF client.")
         .version(crate_version!())
         .arg(Arg::with_name("log-level")
             .short("l")
