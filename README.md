@@ -43,12 +43,14 @@ $ cargo rpm build
 ```
 
 ## TODO
+- [ ] Auto-deactivate client on process termination.
+    - Only on `SIGINT` and `SIGTERM`.
 - [ ] Timestamp to three decimal places.
     - Receiving check results with timestamps like the following:  `2019-03-16T14:53:25.470766743Z`
 - [ ] Concurrency limit.
     - See `--concurrency` CLI parameter.
 - [x] Proper logging.
-- [ ] Package as Docker image.
+- [x] Package as Docker image.
 - [x] Implement check timeout.
 - [ ] Package as RPM.
 - [ ] Package as DEB.

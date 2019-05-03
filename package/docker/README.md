@@ -10,9 +10,6 @@
 - `TAGS` - Corresponds to `--tags` parameter. Required.
 - `REG_PARAMETER` - Corresponds to `--reg-parameter`. Optional.
 
-### Checks
-
-
 ## Build
 ```
 $ docker build --file ./package/docker/Dockerfile --tag smdf-client .

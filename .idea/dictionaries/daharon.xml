@@ -12,6 +12,7 @@
       <w>musl</w>
       <w>rusoto</w>
       <w>serde</w>
+      <w>serverless</w>
       <w>smdf</w>
       <w>sysconfdir</w>
       <w>systemd</w>
