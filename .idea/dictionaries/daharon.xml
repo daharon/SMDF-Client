@@ -6,6 +6,7 @@
       <w>buildroot</w>
       <w>chrono</w>
       <w>coreutils</w>
+      <w>ctrlc</w>
       <w>defattr</w>
       <w>gtimeout</w>
       <w>macos</w>

@@ -40,4 +40,4 @@ echo "Tags:  ${TAGS}"
 CMD="$1 ${OPTS} --region ${REGION} --log-level ${LOG_LEVEL} --environment ${ENVIRONMENT} --name ${NAME} --tags ${TAGS}"
 echo "Command:  ${CMD}"
 
-${CMD}
+exec ${CMD}

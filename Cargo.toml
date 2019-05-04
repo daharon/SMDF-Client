@@ -16,6 +16,7 @@ include = [
 log = "0.4.6"
 simplelog = "0.5.3"
 clap = "2.33.0"
+ctrlc = { version = "3.1.2", features = ["termination"] }
 rusoto_core = "0.38.0"
 rusoto_sqs = "0.38.0"
 rusoto_ssm = "0.38.0"
