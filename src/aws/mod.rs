@@ -2,8 +2,12 @@ use rusoto_core::Region;
 use rusoto_lambda::{
     LambdaClient, Lambda, InvocationRequest
 };
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 
-use crate::messages::registration::{ClientRegistrationRequest, ClientRegistrationResponse};
+use crate::messages::registration::{
+    RegistrationRequest, RegistrationResponse
+};
 
 use std::error::Error;
 
@@ -23,8 +27,12 @@ impl std::fmt::Display for RegistrationError {
 impl Error for RegistrationError { }
 
 
-pub fn register_client(region: &Region, function: &str, request: &ClientRegistrationRequest)
-    -> Result<ClientRegistrationResponse, Box<dyn Error>>
+/// Perform registration and de-registration requests.
+pub fn client_registration<R, S>(region: &Region, function: &str, request: &R)
+    -> Result<S, Box<dyn Error>>
+    where
+        R: RegistrationRequest + Serialize,
+        S: RegistrationResponse + DeserializeOwned
 {
     let payload = serde_json::to_string(request).unwrap().as_bytes().to_vec();
     let invoke_request = InvocationRequest {
@@ -38,7 +46,7 @@ pub fn register_client(region: &Region, function: &str, request: &ClientRegistra
     let client = LambdaClient::new(region.clone());
     let response = client.invoke(invoke_request).sync()?;
     if response.status_code.unwrap() == 200 {
-        let registration_response = serde_json::from_slice::<ClientRegistrationResponse>(response.payload.unwrap().as_ref())?;
+        let registration_response = serde_json::from_slice::<S>(response.payload.unwrap().as_ref())?;
         Ok(registration_response)
     } else {
         let error = RegistrationError {

@@ -3,12 +3,16 @@
 ## Usage
 
 ### Environment Variables
+
+#### Required
+- `ENVIRONMENT` - Corresponds to `--environment` parameter.
+- `TAGS` - Corresponds to `--tags` parameter.
+
+#### Optional
 - `LOG_LEVEL` - Defaults to `INFO`.
-- `ENVIRONMENT` - Corresponds to `--environment` parameter. Required.
-- `NAME` - Required.
+- `AUTO_DEREGISTER` - Corresponds to `--auto-deregister` parameter.
 - `REGION` - Defaults to `AWS_REGION` provided by ECS.
-- `TAGS` - Corresponds to `--tags` parameter. Required.
-- `REG_PARAMETER` - Corresponds to `--reg-parameter`. Optional.
+- `NAME` - Override the client's name.
 
 ## Build
 ```

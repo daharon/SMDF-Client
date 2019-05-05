@@ -43,7 +43,7 @@ $ cargo rpm build
 ```
 
 ## TODO
-- [ ] Auto-deactivate client on process termination.
+- [x] Auto-deactivate client on process termination.
     - Only on `SIGINT` and `SIGTERM`.
 - [ ] Timestamp to three decimal places.
     - Receiving check results with timestamps like the following:  `2019-03-16T14:53:25.470766743Z`

@@ -8,6 +8,9 @@
       <w>coreutils</w>
       <w>ctrlc</w>
       <w>defattr</w>
+      <w>dereg</w>
+      <w>deregistering</w>
+      <w>deregistration</w>
       <w>gtimeout</w>
       <w>macos</w>
       <w>musl</w>

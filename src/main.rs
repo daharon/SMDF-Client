@@ -12,9 +12,7 @@ use simplelog::SimpleLogger;
 use log::{debug, error, info};
 
 use smdf_client::consumer::Consumer;
-use smdf_client::config::{cli, ssm};
-use smdf_client::messages::registration::ClientRegistrationRequest;
-use smdf_client::aws;
+use smdf_client::config::cli;
 
 
 fn main() {
@@ -23,13 +21,13 @@ fn main() {
         .expect("Failed to initialize logging.");
     debug!("Config:  {:?}", config);
 
-    let registration_arn = ssm::get_registration_arn(&config);
-    info!("Registration ARN:  {}", registration_arn);
-    let reg_req = ClientRegistrationRequest::new(&config.client_name, &config.tags);
-    debug!("Registration request:  {:?}", reg_req);
-    let reg_res = aws::register_client(&config.region, &registration_arn, &reg_req);
-
-    let consumer = Arc::new(Consumer::new(config));
+    let consumer: Arc<Consumer> = match Consumer::new(config) {
+        Ok(c) => Arc::new(c),
+        Err(e) => {
+            error!("Failed client registration:  {}", e);
+            panic!(1);
+        },
+    };
     // Set the signal handler for graceful termination.
     let ctrlc_consumer = consumer.clone();
     ctrlc::set_handler(move || {
@@ -37,13 +35,6 @@ fn main() {
         ctrlc_consumer.stop();
     }).expect("Error setting the SIGINT/SIGTERM handler.");
 
-    match reg_res {
-        Ok(res) => {
-            info!("Command queue:  {}", res.command_queue);
-            info!("Result queue:  {}", res.result_queue);
-            consumer.start(&res.command_queue, &res.result_queue);
-        },
-        Err(e) => error!("Failed client registration.\n{}", e),
-    }
+    consumer.start();
 }
 
