@@ -8,14 +8,13 @@ use rusoto_sqs::{
     SqsClient, Sqs, ReceiveMessageRequest,
 };
 
-use crate::aws;
+use crate::aws::{
+    deregistration, registration,
+    RegistrationError, RegistrationRequest
+};
 use crate::check_executor::CheckExecutor;
 use crate::config::cli::Config;
 use crate::config::ssm;
-use crate::messages::registration::{
-    ClientRegistrationRequest, ClientDeregistrationRequest,
-    ClientRegistrationResponse, ClientDeregistrationResponse
-};
 
 
 pub struct Consumer {
@@ -33,10 +32,9 @@ impl Consumer {
         info!("Registration ARN:  {}", registration_arn);
 
         // Register
-        let reg_req = ClientRegistrationRequest::new(&config.client_name, &config.tags);
+        let reg_req = registration::Request::new(&config.client_name, &config.tags);
         debug!("Registration request:  {:?}", reg_req);
-        let reg_res: ClientRegistrationResponse =
-            aws::client_registration(&config.region, &registration_arn, &reg_req)?;
+        let reg_res = reg_req.execute(&config.region, &registration_arn)?;
         info!("Registered as {}", config.client_name);
         info!("Command queue:  {}", reg_res.command_queue);
         info!("Result queue:  {}", reg_res.result_queue);
@@ -115,15 +113,14 @@ impl Consumer {
         let deregistration_arn = ssm::get_registration_arn(&self.config.region, &self.config.deregistration_parameter)?;
         info!("De-registration ARN:  {}", deregistration_arn);
         // De-register
-        let dereg_req = ClientDeregistrationRequest::new(&self.config.client_name);
+        let dereg_req = deregistration::Request::new(&self.config.client_name);
         debug!("De-registration request:  {:?}", dereg_req);
-        let dereg_res: ClientDeregistrationResponse =
-            aws::client_registration(&self.config.region, &deregistration_arn, &dereg_req)?;
+        let dereg_res = dereg_req.execute(&self.config.region, &deregistration_arn)?;
         if dereg_res.code == 200 {
             Ok(())
         } else {
             Err(Box::new(
-                aws::RegistrationError { code: dereg_res.code, description: dereg_res.message }
+                RegistrationError { code: dereg_res.code, description: dereg_res.message }
             ))
         }
     }
