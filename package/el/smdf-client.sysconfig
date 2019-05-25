@@ -1,0 +1,18 @@
+# SMDF Client configuration.
+#
+
+# The client-name to be registered with the monitoring backend.
+NAME=
+
+# The environment this monitoring client is running under.
+# Parameter store path /<env>/monitoring/registration will be used.
+ENVIRONMENT=
+
+# Log level (TRACE, DEBUG, ERROR, WARN, INFO).
+LOG_LEVEL=INFO
+
+# AWS region.
+REGION=
+
+# Comma separated list of the check tags to run on this client.
+TAGS=

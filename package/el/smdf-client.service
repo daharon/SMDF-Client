@@ -1,0 +1,21 @@
+[Unit]
+Description=SMDF client
+After=network.target network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/sysconfig/smdf-client
+ExecStart=/usr/bin/smdf-client \
+    --auto-deregister \
+    --environment ${ENVIRONMENT} \
+    --log-level ${LOG_LEVEL} \
+    --name ${NAME} \
+    --region ${REGION} \
+    --tags ${TAGS}
+KillSignal=SIGTERM
+TimeoutStopSec=45
+KillMode=process
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
